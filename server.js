@@ -74,7 +74,7 @@ app.get("/users", async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Database error" });
+    res.status(500).json("Database error");
   }
 });
 
@@ -85,11 +85,11 @@ app.get("/users/:id", async (req, res) => {
       "SELECT user_id, username, email, avatar_url, wallet_balance, role FROM `User` WHERE user_id = ?",
       [req.params.id]
     );
-    if (rows.length === 0) return res.status(404).json({ error: "User not found" });
+    if (rows.length === 0) return res.status(404).json("User not found");
     res.json(rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Database error" });
+    res.status(500).json("Database error");
   }
 });
 
@@ -98,11 +98,11 @@ app.post("/register/user", upload.single("avatar"), async (req, res) => {
   try {
     const { email, username, password } = req.body;
     if (!email || !username || !password) {
-      return res.status(400).json({ error: "email, username, and password are required" });
+      return res.status(400).json("email, username, and password are required");
     }
 
     if (req.file && req.file.size > 10 * 1024 * 1024) {
-      return res.status(413).json({ error: "ไฟล์รูปใหญ่เกิน 10MB" });
+      return res.status(413).json("ไฟล์รูปใหญ่เกิน 10MB");
     }
 
     let avatarUrl = null;
@@ -124,13 +124,13 @@ app.post("/register/user", upload.single("avatar"), async (req, res) => {
     });
   } catch (err) {
     if (err && err.code === "LIMIT_FILE_SIZE") {
-      return res.status(413).json({ error: "ไฟล์รูปใหญ่เกิน 10MB" });
+      return res.status(413).json("ไฟล์รูปใหญ่เกิน 10MB");
     }
     console.error("Register error:", err);
     if (err.code === "ER_DUP_ENTRY") {
-      return res.status(400).json({ error: "Email already exists" });
+      return res.status(400).json("Email already exists");
     }
-    res.status(500).json({ error: err.message || "Database error" });
+    res.status(500).json(err.message || "Database error");
   }
 });
 
@@ -138,11 +138,11 @@ app.post("/register/user", upload.single("avatar"), async (req, res) => {
 app.put("/users/:id/avatar", upload.single("avatar"), async (req, res) => {
   try {
     if (!req.file?.buffer) {
-      return res.status(400).json({ error: "avatar file is required" });
+      return res.status(400).json("avatar file is required");
     }
 
     if (req.file && req.file.size > 10 * 1024 * 1024) {
-      return res.status(413).json({ error: "ไฟล์รูปใหญ่เกิน 10MB" });
+      return res.status(413).json("ไฟล์รูปใหญ่เกิน 10MB");
     }
 
     const processed = await processImageToWebpSquare(req.file.buffer);
@@ -152,17 +152,60 @@ app.put("/users/:id/avatar", upload.single("avatar"), async (req, res) => {
       "UPDATE `User` SET avatar_url = ? WHERE user_id = ?",
       [uploaded.secure_url, req.params.id]
     );
-    if (rs.affectedRows === 0) return res.status(404).json({ error: "User not found" });
+    if (rs.affectedRows === 0) return res.status(404).json("User not found");
 
     res.json({ ok: true, avatar_url: uploaded.secure_url });
   } catch (e) {
     if (e && e.code === "LIMIT_FILE_SIZE") {
-      return res.status(413).json({ error: "ไฟล์รูปใหญ่เกิน 10MB" });
+      return res.status(413).json("ไฟล์รูปใหญ่เกิน 10MB");
     }
     console.error(e);
-    res.status(500).json({ error: e.message });
+    res.status(500).json(e.message);
   }
 });
+
+// ---------- Login ----------
+app.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json("email and password are required");
+    }
+
+    // หา user ใน DB
+    const [rows] = await pool.query(
+      "SELECT user_id, username, email, password, avatar_url, wallet_balance, role FROM `User` WHERE email = ?",
+      [email]
+    );
+
+    if (rows.length === 0) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const user = rows[0];
+
+    if (user.password !== password) {
+      return res.status(401).json("Invalid email or password");
+    }
+
+    // Login สำเร็จ
+    res.json({
+      message: "Login successful",
+      user: {
+        user_id: user.user_id,
+        username: user.username,
+        email: user.email,
+        avatar_url: user.avatar_url,
+        wallet_balance: user.wallet_balance,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).json("Database error");
+  }
+});
+
 
 // ---------- Start Server ----------
 const PORT = process.env.PORT || 3000;
