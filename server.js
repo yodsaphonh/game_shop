@@ -206,6 +206,61 @@ app.post("/login", async (req, res) => {
   }
 });
 
+// ---------- Update user by body (merge data) ----------
+app.post("/users/update", async (req, res) => {
+  try {
+    const { user_id, username, email, password, wallet_balance, role, avatar_url } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json("user_id is required");
+    }
+
+    // 1. ดึงข้อมูลเก่ามาก่อน
+    const [rows] = await pool.query("SELECT * FROM `User` WHERE user_id = ?", [user_id]);
+    if (rows.length === 0) return res.status(404).json("User not found");
+
+    const oldUser = rows[0];
+
+    // 2. Merge ข้อมูลใหม่กับของเก่า
+    const newUser = {
+      username: username || oldUser.username,
+      email: email || oldUser.email,
+      password: password || oldUser.password,
+      wallet_balance: wallet_balance ?? oldUser.wallet_balance,
+      role: role || oldUser.role,
+      avatar_url: avatar_url || oldUser.avatar_url, // frontend อาจส่ง url มาแทน
+    };
+
+    // 3. อัปเดตลง DB
+    const [rs] = await pool.query(
+      `UPDATE \`User\`
+       SET username = ?, email = ?, password = ?, wallet_balance = ?, role = ?, avatar_url = ?
+       WHERE user_id = ?`,
+      [
+        newUser.username,
+        newUser.email,
+        newUser.password,
+        newUser.wallet_balance,
+        newUser.role,
+        newUser.avatar_url,
+        user_id,
+      ]
+    );
+
+    if (rs.affectedRows === 0) return res.status(404).json("User not found");
+
+    res.json({
+      message: "User updated successfully",
+      user: {
+        user_id,
+        ...newUser,
+      },
+    });
+  } catch (e) {
+    console.error("Update error:", e);
+    res.status(500).json(e.message || "Database error");
+  }
+});
 
 // ---------- Start Server ----------
 const PORT = process.env.PORT || 3000;
