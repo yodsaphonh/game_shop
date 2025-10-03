@@ -67,6 +67,79 @@ app.get("/users/:id", async (req, res) => {
   }
 });
 
+
+// ---------- Register User ----------
+app.post("/register/user", async (req, res) => {
+  try {
+    const { email, username, password, profile_image } = req.body;
+
+    if (!email || !username || !password) {
+      return res.status(400).json({ error: "email, username, and password are required" });
+    }
+
+    // profile_image ต้องเป็น binary buffer (array หรือ base64)
+    let profileBuffer = null;
+    if (profile_image) {
+      if (Array.isArray(profile_image)) {
+        // frontend ส่ง array ของตัวเลขมา เช่น [255, 216, 255, ...]
+        profileBuffer = Buffer.from(profile_image);
+      } else if (typeof profile_image === "string") {
+        // frontend ส่ง base64 string มา
+        profileBuffer = Buffer.from(profile_image, "base64");
+      }
+    }
+
+    const [result] = await pool.query(
+      "INSERT INTO User (username, email, password, profile_image, role) VALUES (?, ?, ?, ?, ?)",
+      [username, email, password, profileBuffer, "user"]
+    );
+
+    res.status(201).json({
+      message: "User registered successfully",
+      user_id: result.insertId,
+    });
+  } catch (err) {
+    console.error("Register error:", err);
+    if (err.code === "ER_DUP_ENTRY") {
+      return res.status(400).json({ error: "Email already exists" });
+    }
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
+// ---------- Register User ----------
+app.post("/register/user", async (req, res) => {
+  try {
+    const { email, username, password, profile_image } = req.body;
+
+    if (!email || !username || !password) {
+      return res.status(400).json({ error: "email, username, and password are required" });
+    }
+
+    // แปลง Base64 → Buffer
+    let profileBuffer = null;
+    if (profile_image) {
+      profileBuffer = Buffer.from(profile_image, "base64");
+    }
+
+    const [result] = await pool.query(
+      "INSERT INTO User (username, email, password, profile_image, role) VALUES (?, ?, ?, ?, ?)",
+      [username, email, password, profileBuffer, "user"]
+    );
+
+    res.status(201).json({
+      message: "User registered successfully",
+      user_id: result.insertId,
+    });
+  } catch (err) {
+    console.error("Register error:", err);
+    if (err.code === "ER_DUP_ENTRY") {
+      return res.status(400).json({ error: "Email already exists" });
+    }
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
 // ---------- Start Server ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
