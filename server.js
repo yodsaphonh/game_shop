@@ -36,7 +36,7 @@ cloudinary.config({
 // ---------- Multer (in-memory, 10MB) ----------
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // <= 10MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ok = ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype);
     if (!ok) return cb(new Error("Only JPEG/PNG/WEBP allowed"));
@@ -62,6 +62,9 @@ async function processImageToWebpSquare(inputBuffer) {
     .toBuffer();
 }
 
+//=================================================================
+//                        ROUTE TEST
+//=================================================================
 // ---------- Test API ----------
 app.get("/", (_, res) => res.send("API on Render 🚀"));
 
@@ -92,6 +95,11 @@ app.get("/users/:id", async (req, res) => {
     res.status(500).json("Database error");
   }
 });
+
+
+//=================================================================
+//                             ROUTE
+//=================================================================
 
 // ---------- Register User ----------
 app.post("/register/user", upload.single("avatar"), async (req, res) => {
@@ -134,36 +142,6 @@ app.post("/register/user", upload.single("avatar"), async (req, res) => {
   }
 });
 
-// ---------- Update avatar only ----------
-app.put("/users/:id/avatar", upload.single("avatar"), async (req, res) => {
-  try {
-    if (!req.file?.buffer) {
-      return res.status(400).json("avatar file is required");
-    }
-
-    if (req.file && req.file.size > 10 * 1024 * 1024) {
-      return res.status(413).json("ไฟล์รูปใหญ่เกิน 10MB");
-    }
-
-    const processed = await processImageToWebpSquare(req.file.buffer);
-    const uploaded = await uploadBufferToCloudinary(processed, "avatars");
-
-    const [rs] = await pool.query(
-      "UPDATE `User` SET avatar_url = ? WHERE user_id = ?",
-      [uploaded.secure_url, req.params.id]
-    );
-    if (rs.affectedRows === 0) return res.status(404).json("User not found");
-
-    res.json({ ok: true, avatar_url: uploaded.secure_url });
-  } catch (e) {
-    if (e && e.code === "LIMIT_FILE_SIZE") {
-      return res.status(413).json("ไฟล์รูปใหญ่เกิน 10MB");
-    }
-    console.error(e);
-    res.status(500).json(e.message);
-  }
-});
-
 // ---------- Login ----------
 app.post("/login", async (req, res) => {
   try {
@@ -188,7 +166,7 @@ app.post("/login", async (req, res) => {
       return res.status(401).json("Invalid email or password");
     }
 
-    // Login สำเร็จ
+    // Login
     res.json({
       message: "Login successful",
       user: {
@@ -209,7 +187,7 @@ app.post("/login", async (req, res) => {
 // ---------- Update user (merge data) ----------
 app.post("/users/update", upload.single("avatar"), async (req, res) => {
   try {
-    const { user_id, username, email, password, wallet_balance, role } = req.body;
+    const { user_id, username } = req.body;
 
     if (!user_id) {
       return res.status(400).json("user_id is required");
@@ -221,7 +199,7 @@ app.post("/users/update", upload.single("avatar"), async (req, res) => {
 
     const oldUser = rows[0];
 
-    // 2. Process avatar ถ้ามีไฟล์
+    // 2. Process avatar
     let avatarUrl = oldUser.avatar_url;
     if (req.file?.buffer) {
       if (req.file.size > 10 * 1024 * 1024) {
@@ -232,7 +210,7 @@ app.post("/users/update", upload.single("avatar"), async (req, res) => {
       avatarUrl = uploaded.secure_url;
     }
 
-    // 3. Merge data (ถ้า field ไม่ส่งมา → ใช้ของเก่า)
+    // 3. Merge data
     const newUser = {
       username: username || oldUser.username,
       email: email || oldUser.email,
