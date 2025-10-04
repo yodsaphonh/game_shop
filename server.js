@@ -213,24 +213,16 @@ app.post("/users/update", upload.single("avatar"), async (req, res) => {
     // 3. Merge data
     const newUser = {
       username: username || oldUser.username,
-      email: email || oldUser.email,
-      password: password || oldUser.password,
-      wallet_balance: wallet_balance ?? oldUser.wallet_balance,
-      role: role || oldUser.role,
       avatar_url: avatarUrl,
     };
 
     // 4. UPDATE DB
     const [rs] = await pool.query(
       `UPDATE \`User\`
-       SET username = ?, email = ?, password = ?, wallet_balance = ?, role = ?, avatar_url = ?
+       SET username = ?, avatar_url = ?
        WHERE user_id = ?`,
       [
         newUser.username,
-        newUser.email,
-        newUser.password,
-        newUser.wallet_balance,
-        newUser.role,
         newUser.avatar_url,
         user_id,
       ]
