@@ -72,7 +72,7 @@ app.get("/", (_, res) => res.send("API on Render 🚀"));
 app.get("/users", async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT user_id, username, email, avatar_url, wallet_balance, role FROM `User`"
+      "SELECT user_id, username, email, password, avatar_url, wallet_balance, role FROM `User`"
     );
     res.json(rows);
   } catch (err) {
@@ -85,7 +85,7 @@ app.get("/users", async (req, res) => {
 app.get("/users/:id", async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT user_id, username, email, avatar_url, wallet_balance, role FROM `User` WHERE user_id = ?",
+      "SELECT user_id, username, email, password, avatar_url, wallet_balance, role FROM `User` WHERE user_id = ?",
       [req.params.id]
     );
     if (rows.length === 0) return res.status(404).json("User not found");
