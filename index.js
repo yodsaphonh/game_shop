@@ -6,7 +6,7 @@ import gameRoutes from "./src/routes/gameRoutes.js";
 import walletRoutes from "./src/routes/walletRoutes.js";
 import cartRoutes from "./src/routes/cartRoutes.js";
 import adminRoutes from "./src/routes/adminRoutes.js"
-
+import discountRoutes from "./src/routes/discountRoutes.js"
 dotenv.config();
 
 const app = express();
@@ -106,8 +106,10 @@ app.get("/", (_, res) => {
 app.use("/users", userRoutes);  // 👤 User module
 app.use("/games", gameRoutes);  // 🎮 Game module (admin only)
 app.use("/wallet", walletRoutes);
-app.use("/cart", cartRoutes)
-app.use("/admin", adminRoutes)
+app.use("/cart", cartRoutes);
+app.use("/admin", adminRoutes);
+app.use("/discounts", discountRoutes);
+
 // 🚀 Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

@@ -5,7 +5,7 @@ import {
   withdrawFromWallet,
   getWalletHistory,
   adminViewUserHistory,
-  purchaseGame
+  purchaseGame,
 } from "../controllers/walletController.js";
 
 const router = express.Router();
@@ -25,4 +25,5 @@ router.get("/history/:user_id", getWalletHistory);
 router.post("/admin/history", adminViewUserHistory);
 
 router.post("/purchase", purchaseGame);
+
 export default router;
