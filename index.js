@@ -5,8 +5,10 @@ import userRoutes from "./src/routes/userRoutes.js";
 import gameRoutes from "./src/routes/gameRoutes.js";
 import walletRoutes from "./src/routes/walletRoutes.js";
 import cartRoutes from "./src/routes/cartRoutes.js";
-import adminRoutes from "./src/routes/adminRoutes.js"
-import discountRoutes from "./src/routes/discountRoutes.js"
+import adminRoutes from "./src/routes/adminRoutes.js";
+import discountRoutes from "./src/routes/discountRoutes.js";
+import rankingRoutes from "./src/routes/rankingRoutes.js";
+
 dotenv.config();
 
 const app = express();
@@ -109,7 +111,7 @@ app.use("/wallet", walletRoutes);
 app.use("/cart", cartRoutes);
 app.use("/admin", adminRoutes);
 app.use("/discounts", discountRoutes);
-
+app.use("/ranking", rankingRoutes);
 // 🚀 Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
