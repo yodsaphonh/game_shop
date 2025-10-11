@@ -2,8 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import userRoutes from "./src/routes/userRoutes.js";
-import gameRoutes from "./src/routes/gameRoutes.js"; // ✅ เพิ่มเข้ามา
-
+import gameRoutes from "./src/routes/gameRoutes.js";
+import walletRoutes from "./src/routes/walletRoutes.js";
 dotenv.config();
 
 const app = express();
@@ -102,7 +102,7 @@ app.get("/", (_, res) => {
 
 app.use("/users", userRoutes);  // 👤 User module
 app.use("/games", gameRoutes);  // 🎮 Game module (admin only)
-
+app.use("/wallet", walletRoutes);
 // 🚀 Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

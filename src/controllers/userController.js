@@ -10,6 +10,27 @@ export async function getAllUsers(req, res) {
   }
 }
 
+/* ---------------------------- GET ALL ADMINS ---------------------------- */
+export async function getAllAdmins(req, res) {
+  try {
+    const [rows] = await pool.query(
+      "SELECT user_id, username, email, role, wallet_balance FROM User WHERE role = 'admin'"
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json("No admin users found");
+    }
+
+    res.json({
+      message: "Admin users fetched successfully",
+      admins: rows
+    });
+  } catch (err) {
+    console.error("Get admins error:", err);
+    res.status(500).json("Database error");
+  }
+}
+
 export async function getUserById(req, res) {
   try {
     const [rows] = await pool.query("SELECT * FROM `User` WHERE user_id = ?", [req.params.id]);

@@ -6,11 +6,13 @@ import {
   registerUser,
   loginUser,
   updateUser,
+  getAllAdmins,
 } from "../controllers/userController.js";
 
 const router = express.Router();
 
 router.get("/", getAllUsers);
+router.get("/role/admin", getAllAdmins);
 router.get("/:id", getUserById);
 router.post("/register", upload.single("avatar"), registerUser);
 router.post("/login", loginUser);

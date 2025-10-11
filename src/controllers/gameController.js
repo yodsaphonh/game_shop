@@ -104,7 +104,6 @@ export async function updateGame(req, res) {
     let cover_url = oldGame.cover_url;
 
     // อัปโหลดภาพใหม่ (ถ้ามี)
-    // อัปโหลดภาพใหม่ (ถ้ามี)
     if (req.file?.buffer) {
       try {
         console.log("🟡 Uploading new game cover...");
@@ -207,5 +206,18 @@ export async function searchGames(req, res) {
   } catch (err) {
     console.error("Search games error:", err);
     res.status(500).json("Database error");
+  }
+}
+
+// ---------------------------- All Category Names ----------------------------
+export async function getAllGameCategories(req, res) {
+  try {
+    const [rows] = await pool.query(
+      "SELECT category_name FROM GameCategory ORDER BY category_id ASC"
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error("❌ Get GameCategory error:", error);
+    res.status(500).json({ error: "Database error" });
   }
 }

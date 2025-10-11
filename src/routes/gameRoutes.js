@@ -6,8 +6,8 @@ import {
   getGameById,
   updateGame,
   deleteGame,
-
-  searchGames
+  searchGames,
+  getAllGameCategories
 } from "../controllers/gameController.js";
 
 const router = express.Router();
@@ -17,7 +17,7 @@ const router = express.Router();
                       Routes All User
    ====================================================== */
 router.get("/search", searchGames);
-
+router.get("/categories", getAllGameCategories);
 
 /* ======================================================
                       Routes Admin
