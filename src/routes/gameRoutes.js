@@ -36,6 +36,6 @@ router.get("/:id", getGameById);
 router.post("/update", upload.single("cover"), updateGame);
 
 // ✅ DELETE — ต้องเป็น Admin เท่านั้น
-router.delete("/:id", deleteGame);
+router.post("/delete", deleteGame)
 
 export default router;

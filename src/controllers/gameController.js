@@ -143,26 +143,32 @@ export async function updateGame(req, res) {
 /* ---------------------------- DELETE GAME ---------------------------- */
 export async function deleteGame(req, res) {
   try {
-    const { id } = req.params;
-    const { deleted_by } = req.body;
+    const { game_id, deleted_by } = req.body;
 
-    if (!deleted_by) return res.status(400).json("deleted_by is required");
+    if (!game_id || !deleted_by) {
+      return res.status(400).json("game_id และ deleted_by จำเป็นต้องระบุ");
+    }
 
-    // ✅ ตรวจสอบสิทธิ์
     const isAdmin = await checkAdmin(deleted_by);
-    if (!isAdmin) return res.status(403).json("Only admin can delete games");
+    if (!isAdmin) {
+      return res.status(403).json("Only admin can delete games");
+    }
 
-    const [rows] = await pool.query("SELECT * FROM Game WHERE game_id = ?", [id]);
-    if (rows.length === 0) return res.status(404).json("Game not found");
+    const [rows] = await pool.query("SELECT * FROM Game WHERE game_id = ?", [game_id]);
+    if (rows.length === 0) {
+      return res.status(404).json("Game not found");
+    }
 
-    await pool.query("DELETE FROM Game WHERE game_id = ?", [id]);
+    await pool.query("DELETE FROM Game WHERE game_id = ?", [game_id]);
+
     res.json({ message: "Game deleted successfully" });
   } catch (err) {
-    console.error("Delete game error:", err);
+    console.error("❌ Delete game error:", err);
     if (err.message === "User not found") return res.status(404).json(err.message);
     res.status(500).json("Database error");
   }
 }
+
 
 /* ---------------------------- SEARCH GAME ---------------------------- */
 export async function searchGames(req, res) {
