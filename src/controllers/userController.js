@@ -105,3 +105,4 @@ export async function updateUser(req, res) {
     res.status(500).json(err.message);
   }
 }
+

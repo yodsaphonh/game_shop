@@ -5,6 +5,8 @@ import userRoutes from "./src/routes/userRoutes.js";
 import gameRoutes from "./src/routes/gameRoutes.js";
 import walletRoutes from "./src/routes/walletRoutes.js";
 import cartRoutes from "./src/routes/cartRoutes.js";
+import adminRoutes from "./src/routes/adminRoutes.js"
+
 dotenv.config();
 
 const app = express();
@@ -105,6 +107,7 @@ app.use("/users", userRoutes);  // 👤 User module
 app.use("/games", gameRoutes);  // 🎮 Game module (admin only)
 app.use("/wallet", walletRoutes);
 app.use("/cart", cartRoutes)
+app.use("/admin", adminRoutes)
 // 🚀 Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

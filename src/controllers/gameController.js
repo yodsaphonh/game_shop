@@ -227,3 +227,102 @@ export async function getAllGameCategories(req, res) {
     res.status(500).json({ error: "Database error" });
   }
 }
+
+export async function getPurchasedGames(req, res) {
+  const { id } = req.params;
+
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        gp.purchase_id,
+        gp.purchase_date,
+        g.game_id,
+        g.name AS game_name,
+        g.price,
+        g.description,
+        g.cover_url,
+        gc.category_name
+      FROM GamePurchase gp
+      JOIN Game g ON gp.game_id = g.game_id
+      LEFT JOIN GameCategory gc ON g.category_id = gc.category_id
+      WHERE gp.user_id = ?
+      ORDER BY gp.purchase_date DESC
+      `,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.json({
+        message: "ยังไม่มีเกมที่ซื้อในระบบ",
+        total: 0,
+        games: [],
+      });
+    }
+
+    res.json({
+      message: "ดึงรายการเกมที่ซื้อสำเร็จ 🎮",
+      total: rows.length,
+      games: rows.map((g) => ({
+        purchase_id: g.purchase_id,
+        game_id: g.game_id,
+        game_name: g.game_name,
+        price: g.price,
+        category: g.category_name,
+        description: g.description,
+        cover_url: g.cover_url,
+        purchase_date: g.purchase_date,
+      })),
+    });
+  } catch (error) {
+    console.error("❌ getPurchasedGames error:", error);
+    res.status(500).json({ error: "Database error" });
+  }
+}
+
+
+/* ---------------------------- จัดอันดับเกมขายดี TOP 5 ---------------------------- */
+export async function getTopSellingGames(req, res) {
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        g.game_id,
+        g.name AS game_name,
+        g.price,
+        g.cover_url,
+        gc.category_name,
+        COUNT(gp.game_id) AS total_sales
+      FROM GamePurchase gp
+      JOIN Game g ON gp.game_id = g.game_id
+      LEFT JOIN GameCategory gc ON g.category_id = gc.category_id
+      GROUP BY g.game_id, g.name, g.price, g.cover_url, gc.category_name
+      ORDER BY total_sales DESC
+      LIMIT 5
+      `
+    );
+
+    if (rows.length === 0) {
+      return res.json({
+        message: "ยังไม่มีข้อมูลการขายเกม",
+        ranking: [],
+      });
+    }
+
+    res.json({
+      message: "จัดอันดับเกมขายดีสำเร็จ 🏆",
+      ranking: rows.map((g, index) => ({
+        rank: index + 1,
+        game_id: g.game_id,
+        game_name: g.game_name,
+        category: g.category_name,
+        price: g.price,
+        total_sales: g.total_sales,
+        cover_url: g.cover_url,
+      })),
+    });
+  } catch (err) {
+    console.error("❌ getTopSellingGames error:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+}

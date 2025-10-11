@@ -7,7 +7,9 @@ import {
   updateGame,
   deleteGame,
   searchGames,
-  getAllGameCategories
+  getAllGameCategories,
+  getPurchasedGames,
+  getTopSellingGames
 } from "../controllers/gameController.js";
 
 const router = express.Router();
@@ -38,4 +40,7 @@ router.post("/update", upload.single("cover"), updateGame);
 // ✅ DELETE — ต้องเป็น Admin เท่านั้น
 router.post("/delete", deleteGame)
 
+router.get("/users/:id/purchases", getPurchasedGames);
+
+router.get("/ranking", getTopSellingGames);
 export default router;
