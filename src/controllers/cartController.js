@@ -200,16 +200,15 @@ export async function checkoutCart(req, res) {
   try {
     await connection.beginTransaction();
 
-    // 1️⃣ ดึงรถเข็นของผู้ใช้
+    // 1) หา cart
     const [cartRows] = await connection.query(
       "SELECT cart_id FROM Cart WHERE user_id = ? AND status = 'active'",
       [user_id]
     );
     if (cartRows.length === 0) throw new Error("ไม่พบรถเข็นของผู้ใช้");
-
     const cart_id = cartRows[0].cart_id;
 
-    // 2️⃣ ดึงรายการเกมในรถเข็น
+    // 2) รายการในรถเข็น
     const [items] = await connection.query(
       `SELECT g.game_id, g.name, g.price, ci.quantity
        FROM CartItem ci
@@ -219,44 +218,56 @@ export async function checkoutCart(req, res) {
     );
     if (items.length === 0) throw new Error("ไม่มีสินค้าในรถเข็น");
 
-    // รวมราคาเกมทั้งหมด
-    let total = items.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
+    // รวมราคา
+    let total = items.reduce((sum, it) => sum + parseFloat(it.price) * it.quantity, 0);
     let discountValue = 0;
     let discountName = null;
 
-    // 3️⃣ ตรวจสอบส่วนลดถ้ามี
+    // 3) ส่วนลด (ครั้งเดียว/ผู้ใช้/โค้ด)
     if (discount_code && discount_code.trim() !== "") {
+      // ดึงโค้ด
       const [codeRows] = await connection.query(
-        "SELECT code_id, discount_value, max_usage FROM DiscountCode WHERE code_name = ?",
+        "SELECT code_id, code_name, discount_value, max_usage FROM DiscountCode WHERE code_name = ?",
         [discount_code]
       );
-
       if (codeRows.length === 0) throw new Error("โค้ดส่วนลดไม่ถูกต้อง");
-      discountValue = parseFloat(codeRows[0].discount_value);
-      discountName = discount_code;
 
-      // ตรวจสอบจำนวนครั้งการใช้
-      const [usage] = await connection.query(
-        "SELECT usage_count FROM DiscountUsage WHERE user_id = ? AND code_id = ?",
-        [user_id, codeRows[0].code_id]
+      const { code_id, discount_value, max_usage } = codeRows[0];
+
+      // (A) ผู้ใช้คนนี้เคยใช้โค้ดนี้แล้วหรือยัง? -> ถ้าเคย ห้ามใช้ซ้ำ
+      const [myUse] = await connection.query(
+        "SELECT usage_id FROM DiscountUsage WHERE user_id = ? AND code_id = ? LIMIT 1",
+        [user_id, code_id]
       );
-
-      if (usage.length > 0 && usage[0].usage_count >= codeRows[0].max_usage) {
-        throw new Error("คุณใช้โค้ดนี้ครบจำนวนครั้งแล้ว");
+      if (myUse.length > 0) {
+        throw new Error("คุณใช้โค้ดนี้ไปแล้ว (ใช้ได้ 1 ครั้งต่อคน)");
       }
 
-      // อัปเดตจำนวนการใช้งานโค้ด
+      // (B) ตรวจยอดใช้รวมของโค้ด เทียบกับ max_usage (เงื่อนไขรวมของระบบ)
+      const [[{ used_total }]] = await connection.query(
+        "SELECT COUNT(*) AS used_total FROM DiscountUsage WHERE code_id = ?",
+        [code_id]
+      );
+      if (max_usage <= 0 || used_total >= max_usage) {
+        throw new Error("โค้ดนี้ถูกใช้ครบตามเงื่อนไขแล้ว");
+      }
+
+      // ผ่านเงื่อนไข -> ใช้ส่วนลด
+      discountValue = parseFloat(discount_value);
+      discountName = discount_code;
+
+      // (C) บันทึกการใช้โค้ด (ครั้งเดียว/คน) — ใส่ 1 ไว้เฉย ๆ
       await connection.query(
         `INSERT INTO DiscountUsage (user_id, code_id, usage_count, used_at)
-         VALUES (?, ?, 1, NOW())
-         ON DUPLICATE KEY UPDATE usage_count = usage_count + 1, used_at = NOW()`,
-        [user_id, codeRows[0].code_id]
+         VALUES (?, ?, 1, NOW())`,
+        [user_id, code_id]
       );
+      // หมายเหตุ: ไม่มี ON DUPLICATE UPDATE เพื่อกันใช้ซ้ำ
     }
 
     const totalAfterDiscount = Math.max(0, total - discountValue);
 
-    // 4️⃣ ตรวจสอบยอดเงินในกระเป๋า
+    // 4) ตรวจ wallet
     const [userRows] = await connection.query(
       "SELECT wallet_balance FROM User WHERE user_id = ?",
       [user_id]
@@ -266,21 +277,19 @@ export async function checkoutCart(req, res) {
     const walletBalance = parseFloat(userRows[0].wallet_balance);
     if (walletBalance < totalAfterDiscount) throw new Error("ยอดเงินในกระเป๋าไม่เพียงพอ");
 
+    // 5) หักเงิน + log
     const newBalance = walletBalance - totalAfterDiscount;
-
-    // 5️⃣ หักเงินใน wallet
     await connection.query(
       "UPDATE User SET wallet_balance = ? WHERE user_id = ?",
       [newBalance.toFixed(2), user_id]
     );
-
     await connection.query(
       `INSERT INTO WalletTransaction (user_id, type, amount, date)
        VALUES (?, 'debit', ?, NOW())`,
       [user_id, totalAfterDiscount]
     );
 
-    // 6️⃣ บันทึกเกมที่ซื้อเข้า GamePurchase
+    // 6) บันทึกการซื้อ
     for (const item of items) {
       await connection.query(
         `INSERT INTO GamePurchase (user_id, game_id, purchase_date)
@@ -289,7 +298,7 @@ export async function checkoutCart(req, res) {
       );
     }
 
-    // 7️⃣ ล้างรถเข็น + ปิดสถานะ cart
+    // 7) ปิด cart
     await connection.query("DELETE FROM CartItem WHERE cart_id = ?", [cart_id]);
     await connection.query("UPDATE Cart SET status = 'paid' WHERE cart_id = ?", [cart_id]);
 
@@ -302,7 +311,7 @@ export async function checkoutCart(req, res) {
       total_before: total,
       total_after: totalAfterDiscount,
       balance_after: newBalance,
-      games_purchased: items.map((i) => i.name),
+      games_purchased: items.map(i => i.name),
     });
   } catch (error) {
     await connection.rollback();
