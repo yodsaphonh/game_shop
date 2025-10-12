@@ -227,7 +227,7 @@ export async function searchGames(req, res) {
 export async function getAllGameCategories(req, res) {
   try {
     const [rows] = await pool.query(
-      "SELECT category_name,  FROM GameCategory ORDER BY category_id ASC"
+      "SELECT category_name FROM GameCategory ORDER BY category_id ASC"
     );
     res.json(rows);
   } catch (error) {
