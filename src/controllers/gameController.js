@@ -173,10 +173,10 @@ export async function deleteGame(req, res) {
 /* ---------------------------- SEARCH GAME ---------------------------- */
 export async function searchGames(req, res) {
   try {
-    const { name, category } = req.query;
+    const { name, category_id } = req.query;
 
-    // ถ้าไม่ใส่อะไรเลย -> return ทุกเกม
-    if (!name && !category) {
+    // ถ้าไม่ใส่อะไรเลย -> คืนทุกเกม
+    if (!name && !category_id) {
       const [rows] = await pool.query(`
         SELECT g.*, c.category_name
         FROM Game g
@@ -186,7 +186,7 @@ export async function searchGames(req, res) {
       return res.json(rows);
     }
 
-    // สร้างเงื่อนไขการค้นหาแบบ flexible
+    // สร้าง query แบบ flexible
     let sql = `
       SELECT g.*, c.category_name
       FROM Game g
@@ -195,31 +195,39 @@ export async function searchGames(req, res) {
     `;
     const params = [];
 
+    // ค้นตามชื่อเกม (ถ้ามี)
     if (name) {
       sql += " AND g.name LIKE ?";
       params.push(`%${name}%`);
     }
 
-    if (category) {
-      sql += " AND c.category_name LIKE ?";
-      params.push(`%${category}%`);
+    // ค้นตาม category_id เดี่ยว (ถ้ามี)
+    if (category_id !== undefined) {
+      const id = Number(category_id);
+      if (!Number.isInteger(id)) {
+        return res.status(400).json({ error: "category_id ต้องเป็นเลขจำนวนเต็ม" });
+      }
+      sql += " AND g.category_id = ?";
+      params.push(id);
     }
 
     sql += " ORDER BY g.game_id DESC";
 
     const [rows] = await pool.query(sql, params);
-    res.json(rows);
+    return res.json(rows);
   } catch (err) {
     console.error("Search games error:", err);
-    res.status(500).json("Database error");
+    return res.status(500).json("Database error");
   }
 }
+
+
 
 // ---------------------------- All Category Names ----------------------------
 export async function getAllGameCategories(req, res) {
   try {
     const [rows] = await pool.query(
-      "SELECT category_name FROM GameCategory ORDER BY category_id ASC"
+      "SELECT category_name,  FROM GameCategory ORDER BY category_id ASC"
     );
     res.json(rows);
   } catch (error) {
