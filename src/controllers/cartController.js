@@ -85,26 +85,45 @@ export async function getCartByUser(req, res) {
   try {
     const [rows] = await pool.query(
       `
-      SELECT ci.cart_item_id, g.game_id, g.name AS game_name, g.price, ci.quantity,
-             (g.price * ci.quantity) AS total_price
+      SELECT 
+        ci.cart_item_id,
+        g.game_id,
+        g.name         AS game_name,
+        g.price,
+        ci.quantity,
+        g.cover_url    AS image_url,   -- << รูปหน้าปกเกม
+        (g.price * ci.quantity) AS total_price
       FROM Cart c
       JOIN CartItem ci ON c.cart_id = ci.cart_id
-      JOIN Game g ON ci.game_id = g.game_id
-      WHERE c.user_id = ? AND c.status = 'active'
-    `,
+      JOIN Game g      ON ci.game_id = g.game_id
+      WHERE c.user_id = ? 
+        AND c.status = 'active'
+      ORDER BY ci.cart_item_id
+      `,
       [user_id]
     );
 
-    if (rows.length === 0)
+    if (!rows.length) {
       return res.json({ message: "ไม่มีเกมในรถเข็น", total_price: 0, items: [] });
+    }
 
-    // รวมราคาทั้งหมด
-    const total = rows.reduce((sum, item) => sum + parseFloat(item.total_price), 0);
+    // แปลงค่าจำนวนเงินให้เป็น number (กัน DECIMAL เป็น string)
+    const items = rows.map(r => ({
+      cart_item_id: r.cart_item_id,
+      game_id: r.game_id,
+      game_name: r.game_name,
+      price: Number(r.price),
+      quantity: Number(r.quantity),
+      image_url: r.image_url,          // << ส่ง URL รูปไปให้ฟรอนต์
+      total_price: Number(r.total_price),
+    }));
+
+    const total = items.reduce((sum, it) => sum + it.total_price, 0);
 
     res.json({
       message: "ดึงรายการรถเข็นสำเร็จ",
-      total_price: total.toFixed(2),
-      items: rows,
+      total_price: Number(total.toFixed(2)),
+      items,
     });
   } catch (err) {
     console.error("❌ getCartByUser error:", err);
