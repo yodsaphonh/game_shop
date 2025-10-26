@@ -213,7 +213,8 @@ export async function clearCart(req, res) {
 
 
 export async function checkoutCart(req, res) {
-  const { user_id, discount_code } = req.body;
+  // ✅ รับ code_id (แนะนำ) และยังรับ discount_code (compatibility)
+  const { user_id, code_id: codeIdRaw, discount_code } = req.body;
 
   const connection = await pool.getConnection();
   try {
@@ -241,17 +242,36 @@ export async function checkoutCart(req, res) {
     let total = items.reduce((sum, it) => sum + parseFloat(it.price) * it.quantity, 0);
     let discountValue = 0;
     let discountName = null;
+    let discountCodeId = null;
 
-    // 3) ส่วนลด (ครั้งเดียว/ผู้ใช้/โค้ด)
-    if (discount_code && discount_code.trim() !== "") {
-      // ดึงโค้ด
-      const [codeRows] = await connection.query(
-        "SELECT code_id, code_name, discount_value, max_usage FROM DiscountCode WHERE code_name = ?",
-        [discount_code]
-      );
-      if (codeRows.length === 0) throw new Error("โค้ดส่วนลดไม่ถูกต้อง");
+    // 3) ส่วนลด
+    // ใช้ code_id ถ้ามี, ถ้าไม่มีค่อย fallback ไปที่ discount_code (ข้อความ)
+    const codeId = Number.isFinite(Number(codeIdRaw)) ? Number(codeIdRaw) : null;
 
-      const { code_id, discount_value, max_usage } = codeRows[0];
+    if ((codeId && codeId > 0) || (discount_code && String(discount_code).trim() !== "")) {
+      let codeRow;
+
+      if (codeId && codeId > 0) {
+        // ✅ ดึงโดย code_id
+        const [rows] = await connection.query(
+          "SELECT code_id, code_name, discount_value, max_usage FROM DiscountCode WHERE code_id = ?",
+          [codeId]
+        );
+        if (rows.length === 0) throw new Error("ไม่พบโค้ดส่วนลดตาม code_id ที่ส่งมา");
+        codeRow = rows[0];
+      } else {
+        // (รองรับของเก่า) ดึงโดยชื่อโค้ด
+        const [rows] = await connection.query(
+          "SELECT code_id, code_name, discount_value, max_usage FROM DiscountCode WHERE code_name = ?",
+          [discount_code]
+        );
+        if (rows.length === 0) throw new Error("โค้ดส่วนลดไม่ถูกต้อง");
+        codeRow = rows[0];
+      }
+
+      const { code_id, code_name, discount_value, max_usage } = codeRow;
+      discountCodeId = code_id;
+      discountName = code_name;
 
       // (A) ผู้ใช้คนนี้เคยใช้โค้ดนี้แล้วหรือยัง? -> ถ้าเคย ห้ามใช้ซ้ำ
       const [myUse] = await connection.query(
@@ -262,7 +282,7 @@ export async function checkoutCart(req, res) {
         throw new Error("คุณใช้โค้ดนี้ไปแล้ว (ใช้ได้ 1 ครั้งต่อคน)");
       }
 
-      // (B) ตรวจยอดใช้รวมของโค้ด เทียบกับ max_usage (เงื่อนไขรวมของระบบ)
+      // (B) ตรวจยอดใช้รวมของโค้ด เทียบกับ max_usage
       const [[{ used_total }]] = await connection.query(
         "SELECT COUNT(*) AS used_total FROM DiscountUsage WHERE code_id = ?",
         [code_id]
@@ -273,15 +293,13 @@ export async function checkoutCart(req, res) {
 
       // ผ่านเงื่อนไข -> ใช้ส่วนลด
       discountValue = parseFloat(discount_value);
-      discountName = discount_code;
 
-      // (C) บันทึกการใช้โค้ด (ครั้งเดียว/คน) — ใส่ 1 ไว้เฉย ๆ
+      // (C) บันทึกการใช้โค้ด
       await connection.query(
         `INSERT INTO DiscountUsage (user_id, code_id, usage_count, used_at)
          VALUES (?, ?, 1, NOW())`,
         [user_id, code_id]
       );
-      // หมายเหตุ: ไม่มี ON DUPLICATE UPDATE เพื่อกันใช้ซ้ำ
     }
 
     const totalAfterDiscount = Math.max(0, total - discountValue);
@@ -325,8 +343,10 @@ export async function checkoutCart(req, res) {
 
     res.json({
       message: "ชำระเงินสำเร็จ ✅",
-      discount_applied: discountName,
-      discount_value: discountValue,
+      // ส่งคืนทั้งชื่อโค้ดและไอดีที่ใช้จริง เพื่อ debug/แสดงผลใน UI ได้ชัดเจน
+      discount: discountCodeId
+        ? { code_id: discountCodeId, code_name: discountName, value: discountValue }
+        : null,
       total_before: total,
       total_after: totalAfterDiscount,
       balance_after: newBalance,
